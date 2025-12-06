@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>عرض الصكوك الذكية - غوطي ادم</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- إعدادات النظام والألوان --- */
+        :root {
+            --primary: #06b6d4;      /* Cyan */
+            --secondary: #a855f7;    /* Purple */
+            --bg-dark: #0f172a;      /* Slate 900 */
+            --glass-bg: rgba(30, 41, 59, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --transition-speed: 1000ms;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: var(--bg-dark);
+            color: white;
+            margin: 0; padding: 0;
+            height: 100vh; width: 100vw;
+            overflow: hidden;
+            perspective: 1500px;
+        }
+
+        #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+        #presentation-container { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
+
+        /* --- الشرائح (Slides) --- */
+        .slide {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; flex-direction: column; justify-content: center; align-items: center; padding: 20px;
+            backface-visibility: hidden; transform-style: preserve-3d;
+            transition: transform var(--transition-speed) cubic-bezier(0.645, 0.045, 0.355, 1), opacity var(--transition-speed);
+            opacity: 0; z-index: 1;
+        }
+        .slide.active { display: flex; opacity: 1; transform: translate3d(0, 0, 0); z-index: 10; }
+        .slide-content { transform-style: preserve-3d; transition: transform 0.1s ease-out; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
+
+        /* --- Animations & Symbols --- */
+        .float-symbol {
+            position: absolute; font-size: 4rem; opacity: 0.1; color: var(--primary); pointer-events: none; z-index: -1; filter: blur(2px);
+            animation: swim 10s ease-in-out infinite alternate;
+        }
+        @keyframes swim { 0% { transform: translate3d(0, 0, -50px) rotate(0deg); } 100% { transform: translate3d(20px, -40px, 50px) rotate(15deg); } }
+        .fs-1 { top: 10%; left: 10%; animation-delay: 0s; color: #a855f7; font-size: 6rem; }
+        .fs-2 { bottom: 15%; right: 10%; animation-delay: 1s; color: #22d3ee; font-size: 5rem; }
+        .fs-3 { top: 40%; left: 80%; animation-delay: 2s; color: #f472b6; font-size: 4rem; }
+        .fs-4 { top: 20%; right: 25%; animation-delay: 0.5s; color: #34d399; opacity: 0.05; font-size: 8rem; }
+        .fs-5 { bottom: 10%; left: 30%; animation-delay: 1.5s; color: #fbbf24; font-size: 3rem; }
+        .depth-front { z-index: 20; opacity: 0.4; filter: blur(0); transform: translateZ(100px); }
+        .depth-back { z-index: -1; opacity: 0.1; filter: blur(4px); transform: translateZ(-100px); }
+
+        /* --- Transitions --- */
+        .slide.rotate-out-right { display: flex; animation: rotateOutRight var(--transition-speed) forwards; }
+        .slide.rotate-in-left { display: flex; animation: rotateInLeft var(--transition-speed) forwards; }
+        .slide.rotate-out-left { display: flex; animation: rotateOutLeft var(--transition-speed) forwards; }
+        .slide.rotate-in-right { display: flex; animation: rotateInRight var(--transition-speed) forwards; }
+        /* Transitions for Jumping (Fade Zoom) */
+        .slide.zoom-out { display: flex; animation: zoomOut var(--transition-speed) forwards; }
+        .slide.zoom-in { display: flex; animation: zoomIn var(--transition-speed) forwards; }
+
+        @keyframes rotateOutRight { 0% { transform: translate3d(0, 0, 0) rotateY(0deg); opacity: 1; } 100% { transform: translate3d(50%, 0, -1000px) rotateY(-90deg); opacity: 0; } }
+        @keyframes rotateInLeft { 0% { transform: translate3d(-50%, 0, -1000px) rotateY(90deg); opacity: 0; } 100% { transform: translate3d(0, 0, 0) rotateY(0deg); opacity: 1; } }
+        @keyframes rotateOutLeft { 0% { transform: translate3d(0, 0, 0) rotateY(0deg); opacity: 1; } 100% { transform: translate3d(-50%, 0, -1000px) rotateY(90deg); opacity: 0; } }
+        @keyframes rotateInRight { 0% { transform: translate3d(50%, 0, -1000px) rotateY(-90deg); opacity: 0; } 100% { transform: translate3d(0, 0, 0) rotateY(0deg); opacity: 1; } }
+        
+        @keyframes zoomOut { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.5) translateZ(-500px); } }
+        @keyframes zoomIn { 0% { opacity: 0; transform: scale(1.5) translateZ(500px); } 100% { opacity: 1; transform: scale(1) translateZ(0); } }
+
+        /* --- Components --- */
+        .glass { background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5); border-radius: 20px; transform: translateZ(20px); transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .glass:hover { transform: translateZ(40px) scale(1.02); box-shadow: 0 15px 40px 0 rgba(6, 182, 212, 0.2); }
+        .custom-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        .custom-table th { background: rgba(6,182,212,0.2); color: #22d3ee; padding: 15px; border-bottom: 2px solid #06b6d4; }
+        .custom-table td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .cube-wrapper { width: 80px; height: 80px; perspective: 800px; margin: 0 auto 20px auto; transform: translateZ(50px); }
+        .cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; animation: spin 12s infinite linear; }
+        .face { position: absolute; width: 80px; height: 80px; background: rgba(6,182,212,0.15); border: 2px solid #06b6d4; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: white; box-shadow: 0 0 15px rgba(6,182,212,0.3); }
+        .f-front { transform: translateZ(40px); } .f-back { transform: rotateY(180deg) translateZ(40px); } .f-right { transform: rotateY(90deg) translateZ(40px); } .f-left { transform: rotateY(-90deg) translateZ(40px); } .f-top { transform: rotateX(90deg) translateZ(40px); } .f-bottom { transform: rotateX(-90deg) translateZ(40px); }
+        @keyframes spin { from { transform: rotateX(0) rotateY(0); } to { transform: rotateX(360deg) rotateY(360deg); } }
+        .custom-scroll::-webkit-scrollbar { width: 6px; } .custom-scroll::-webkit-scrollbar-thumb { background: #06b6d4; border-radius: 3px; }
+        .controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateZ(100px); z-index: 50; display: flex; gap: 20px; align-items: center; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.2); padding: 10px 20px; border-radius: 50px; backdrop-filter: blur(5px); }
+
+        /* --- RETURN BUTTON (NEW) --- */
+        .return-btn {
+            position: absolute; bottom: 40px; right: 40px;
+            background: rgba(15, 23, 42, 0.8); border: 1px solid var(--primary);
+            color: var(--primary); padding: 12px 25px; border-radius: 30px;
+            cursor: pointer; z-index: 100; backdrop-filter: blur(5px);
+            transition: all 0.3s; transform: translateZ(60px);
+            display: flex; align-items: center; gap: 10px; font-weight: bold;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+        }
+        .return-btn:hover { background: var(--primary); color: #0f172a; transform: translateZ(70px) scale(1.1); box-shadow: 0 0 30px var(--primary); }
+
+        /* --- STYLES FOR SLIDE 3 (Structure) --- */
+        .structure-container { display: flex; gap: 20px; justify-content: center; align-items: center; width: 100%; perspective: 1200px; flex-wrap: wrap; max-width: 1200px; }
+        .structure-card { width: 200px; height: 320px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 15px; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; transform-style: preserve-3d; cursor: pointer; transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1); box-shadow: 0 10px 20px rgba(0,0,0,0.5); position: relative; overflow: hidden; }
+        .structure-card:nth-child(1) { transform: rotateY(20deg) translateZ(-50px); border-top: 4px solid #22d3ee; }
+        .structure-card:nth-child(2) { transform: rotateY(10deg) translateZ(-25px); border-top: 4px solid #a855f7; }
+        .structure-card:nth-child(3) { transform: rotateY(0deg) translateZ(0); border-top: 4px solid #4ade80; }
+        .structure-card:nth-child(4) { transform: rotateY(-10deg) translateZ(-25px); border-top: 4px solid #fbbf24; }
+        .structure-card:nth-child(5) { transform: rotateY(-20deg) translateZ(-50px); border-top: 4px solid #f87171; }
+        .structure-card:hover { transform: rotateY(0) translateZ(80px) scale(1.1); z-index: 50; background: rgba(30, 41, 59, 0.95); box-shadow: 0 0 30px var(--hover-color); }
+        .structure-card h3 { font-size: 1.1rem; font-weight: bold; color: white; margin-bottom: 10px; }
+        .structure-card p { font-size: 0.8rem; color: #94a3b8; line-height: 1.4; }
+        .structure-card .icon-box { font-size: 2.5rem; margin-bottom: auto; margin-top: 10px; transition: transform 0.3s; }
+        .structure-card:hover .icon-box { transform: scale(1.2) rotateY(180deg); }
+        .structure-card .btn-jump { margin-top: 15px; padding: 8px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .structure-card:hover .btn-jump { background: var(--hover-color); color: #0f172a; }
+
+        /* --- STYLES FOR SLIDE 8 (Ecosystem) --- */
+        .scene-container { perspective: 1200px; width: 100%; height: 80vh; display: flex; justify-content: center; align-items: center; position: relative; }
+        .ecosystem-plane { position: relative; width: 800px; height: 500px; transform-style: preserve-3d; transform: rotateX(25deg); transition: transform 0.2s ease-out; }
+        .floor-grid { position: absolute; inset: -20%; transform: translateZ(-50px); background: linear-gradient(rgba(6,182,212,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(6,182,212,0.1) 1px, transparent 1px); background-size: 50px 50px; mask-image: radial-gradient(circle, black 30%, transparent 70%); -webkit-mask-image: radial-gradient(circle, black 30%, transparent 70%); pointer-events: none; }
+        .eco-node { position: absolute; width: 180px; padding: 15px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 15px; text-align: center; transform-style: preserve-3d; cursor: pointer; transition: all 0.4s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        @keyframes float-node { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(0, -15px, 10px); } }
+        .eco-node:hover { background: rgba(30, 41, 59, 0.95); box-shadow: 0 0 30px var(--node-glow); transform: translateZ(60px) scale(1.1) !important; z-index: 100; border-color: var(--node-color); }
+        .eco-node i { font-size: 2.5rem; margin-bottom: 10px; display: block; color: var(--node-color); text-shadow: 0 5px 15px var(--node-glow); }
+        .node-center { top: 50%; left: 50%; width: 220px; margin-left: -110px; margin-top: -80px; --node-color: #22d3ee; --node-glow: rgba(34, 211, 238, 0.4); border: 2px solid #22d3ee; z-index: 10; animation: float-node 6s ease-in-out infinite; }
+        .node-top { top: -10%; left: 50%; margin-left: -90px; --node-color: #4ade80; --node-glow: rgba(74, 222, 128, 0.4); animation: float-node 5s ease-in-out infinite 0.5s; }
+        .node-right-top { top: 20%; right: -5%; --node-color: #a855f7; --node-glow: rgba(168, 85, 247, 0.4); animation: float-node 7s ease-in-out infinite 1s; }
+        .node-right-bottom { bottom: 10%; right: -5%; --node-color: #ec4899; --node-glow: rgba(236, 72, 153, 0.4); animation: float-node 6s ease-in-out infinite 1.5s; }
+        .node-left-top { top: 20%; left: -5%; --node-color: #60a5fa; --node-glow: rgba(96, 165, 250, 0.4); animation: float-node 5.5s ease-in-out infinite 2s; }
+        .node-left-bottom { bottom: 10%; left: -5%; --node-color: #facc15; --node-glow: rgba(250, 204, 21, 0.4); animation: float-node 6.5s ease-in-out infinite 2.5s; }
+        .connections-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transform: translateZ(-10px); overflow: visible; }
+        .connection-line { fill: none; stroke: rgba(255, 255, 255, 0.1); stroke-width: 2; }
+        .connection-pulse { fill: none; stroke: var(--primary); stroke-width: 3; stroke-dasharray: 10 200; stroke-linecap: round; animation: dash 3s linear infinite; filter: drop-shadow(0 0 5px var(--primary)); opacity: 0.8; }
+        @keyframes dash { to { stroke-dashoffset: -210; } }
+
+        /* --- SLIDE 9 STYLES (Pipeline) --- */
+        .workflow-plane { position: relative; width: 900px; height: 500px; transform-style: preserve-3d; transform: rotateX(20deg) rotateY(10deg); transition: transform 0.2s ease-out; }
+        .step-card { position: absolute; width: 220px; height: 140px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(8px); border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; transform-style: preserve-3d; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .step-card:hover { background: rgba(6, 182, 212, 0.15); border-color: var(--step-color); transform: translateZ(50px) scale(1.1); box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 20px var(--step-glow); z-index: 50; }
+        .step-badge { position: absolute; top: -15px; right: -15px; width: 40px; height: 40px; border-radius: 50%; background: var(--bg-dark); border: 2px solid var(--step-color); color: var(--step-color); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; transform: translateZ(30px); box-shadow: 0 5px 10px rgba(0,0,0,0.3); }
+        .step-icon { font-size: 2.5rem; color: var(--step-color); margin-bottom: 10px; transform: translateZ(20px); transition: transform 0.3s; }
+        .step-card:hover .step-icon { transform: translateZ(40px) rotateY(180deg); }
+        .step-title { color: white; font-weight: bold; font-size: 1.1rem; transform: translateZ(10px); }
+        .step-desc { font-size: 0.75rem; color: #94a3b8; margin-top: 5px; transform: translateZ(10px); opacity: 0.8; }
+        .step-1 { top: 10%; left: 5%; --step-color: #22d3ee; --step-glow: rgba(34,211,238,0.4); animation: float-step 4s ease-in-out infinite; }
+        .step-2 { top: 10%; left: 38%; --step-color: #818cf8; --step-glow: rgba(129,140,248,0.4); animation: float-step 4s ease-in-out infinite 0.5s; }
+        .step-3 { top: 10%; left: 71%; --step-color: #a855f7; --step-glow: rgba(168,85,247,0.4); animation: float-step 4s ease-in-out infinite 1s; }
+        .step-4 { top: 60%; left: 71%; --step-color: #f472b6; --step-glow: rgba(244,114,182,0.4); animation: float-step 4s ease-in-out infinite 1.5s; }
+        .step-5 { top: 60%; left: 38%; --step-color: #fbbf24; --step-glow: rgba(251,191,36,0.4); animation: float-step 4s ease-in-out infinite 2s; }
+        .step-6 { top: 60%; left: 5%; --step-color: #34d399; --step-glow: rgba(52,211,153,0.4); animation: float-step 4s ease-in-out infinite 2.5s; }
+        @keyframes float-step { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .pipeline-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transform: translateZ(-20px); filter: drop-shadow(0 0 10px rgba(6,182,212,0.3)); }
+        .pipe-path { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 15; stroke-linecap: round; }
+        .pipe-core { fill: none; stroke: rgba(6,182,212,0.5); stroke-width: 2; stroke-dasharray: 10 10; animation: flow 30s linear infinite; }
+        .data-packet { offset-path: path("M 115 80 L 760 80 L 760 330 L 115 330"); offset-distance: 0%; animation: packet-travel 6s linear infinite; }
+        .packet-glow { fill: white; filter: drop-shadow(0 0 10px #22d3ee); }
+        @keyframes packet-travel { 0% { offset-distance: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+
+        /* --- SLIDE 7 STYLES (Evolution Bridge) --- */
+        .comparison-stage { width: 100%; max-width: 1000px; perspective: 1000px; display: flex; flex-direction: column; gap: 25px; }
+        .comp-row { display: flex; align-items: stretch; justify-content: center; height: 100px; width: 100%; transform-style: preserve-3d; transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1); position: relative; }
+        .comp-row:hover { transform: scale(1.05) translateZ(50px); }
+        .side-block { flex: 1; display: flex; align-items: center; padding: 0 20px; position: relative; transition: all 0.4s; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.05); }
+        .side-left { border-radius: 0 20px 20px 0; justify-content: flex-end; text-align: left; border-right: 4px solid #64748b; margin-right: 10px; transform: rotateY(5deg); transform-origin: right center; }
+        .side-left .text-content { opacity: 0.6; transition: opacity 0.3s; }
+        .side-right { border-radius: 20px 0 0 20px; justify-content: flex-start; text-align: right; border-left: 4px solid var(--primary); margin-left: 10px; transform: rotateY(-5deg); transform-origin: left center; background: rgba(6, 182, 212, 0.1); }
+        .pivot-point { width: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1e293b; border: 2px solid var(--primary); border-radius: 15px; transform: translateZ(20px); z-index: 10; box-shadow: 0 0 15px rgba(6, 182, 212, 0.2); transition: all 0.4s; }
+        .pivot-point h4 { font-size: 0.9rem; font-weight: bold; color: white; margin-top: 5px; }
+        .pivot-point i { font-size: 1.5rem; color: var(--primary); }
+        .comp-row:hover .side-left { background: rgba(239, 68, 68, 0.1); border-right-color: #ef4444; transform: rotateY(15deg) translateX(-20px); }
+        .comp-row:hover .side-left .text-content { opacity: 1; color: #fca5a5; }
+        .comp-row:hover .side-right { background: rgba(6, 182, 212, 0.3); border-left-color: #22d3ee; transform: rotateY(-15deg) translateX(20px); box-shadow: 0 0 30px rgba(6,182,212,0.3); }
+        .comp-row:hover .side-right .text-content { font-weight: bold; color: #fff; text-shadow: 0 0 10px var(--primary); }
+        .comp-row:hover .pivot-point { background: var(--primary); border-color: white; transform: translateZ(60px) scale(1.1); box-shadow: 0 0 30px var(--primary); }
+        .comp-row:hover .pivot-point i, .comp-row:hover .pivot-point h4 { color: #0f172a; }
+        .side-icon { font-size: 1.5rem; margin: 0 15px; opacity: 0.5; }
+        .comp-row:hover .side-icon { opacity: 1; transform: scale(1.2); }
+
+        @media (max-width: 768px) {
+            .workflow-plane { transform: none !important; width: 100%; height: auto; display: flex; flex-direction: column; gap: 15px; padding-bottom: 80px; }
+            .step-card { position: relative; top: auto !important; left: auto !important; width: 90%; margin: 0 auto; height: 100px; flex-direction: row; padding: 0 20px; text-align: right; gap: 15px; animation: none !important; }
+            .step-badge { left: -10px; right: auto; top: -10px; }
+            .step-icon { margin-bottom: 0; transform: none !important; font-size: 2rem; }
+            .pipeline-svg { display: none; }
+            .comp-row { flex-direction: column; height: auto; margin-bottom: 20px; }
+            .side-block { width: 100%; padding: 10px; text-align: center; justify-content: center; }
+            .pivot-point { width: 100%; margin: 5px 0; }
+            .structure-container { flex-direction: column; height: 70vh; overflow-y: scroll; flex-wrap: nowrap; align-items: center; }
+            .structure-card { width: 90%; height: 150px; flex-direction: row; align-items: center; margin-bottom: 15px; transform: none !important; }
+            .return-btn { bottom: 80px; right: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="presentation-container">
+
+        <!-- الشريحة 1: الغلاف -->
+        <div class="slide active">
+            <div class="slide-content">
+                <i class="fas fa-network-wired float-symbol fs-1 depth-back"></i>
+                <i class="fas fa-cube float-symbol fs-2 depth-front"></i>
+                <i class="fas fa-coins float-symbol fs-3 depth-back"></i>
+                <div class="cube-wrapper">
+                    <div class="cube">
+                        <div class="face f-front"><i class="fas fa-kaaba"></i></div>
+                        <div class="face f-back"><i class="fas fa-code"></i></div>
+                        <div class="face f-right"><i class="fas fa-coins"></i></div>
+                        <div class="face f-left"><i class="fas fa-chart-line"></i></div>
+                        <div class="face f-top"><i class="fas fa-link"></i></div>
+                        <div class="face f-bottom"><i class="fas fa-leaf"></i></div>
+                    </div>
+                </div>
+                <h2 class="text-gray-400 mb-2">المدرسة الوطنية العليا للعلوم الإسلامية - دار القرآن</h2>
+                <h1 class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 mb-6 text-center leading-tight">
+                    دور الصكوك الذكية في تمويل<br>المؤسسات الناشئة
+                </h1>
+                <div class="glass p-6 text-center w-full max-w-lg">
+                    <div class="flex justify-between border-b border-gray-600 pb-2 mb-2"><span class="text-gray-400">الطالب:</span><span class="font-bold text-cyan-400">غوطي ادم</span></div>
+                    <div class="flex justify-between border-b border-gray-600 pb-2 mb-2"><span class="text-gray-400">التخصص:</span><span class="font-bold">الأسواق المالية الإسلامية</span></div>
+                    <div class="flex justify-between"><span class="text-gray-400">السنة:</span><span class="font-bold">2025 / 2026</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الشريحة 2: المقدمة -->
+        <div class="slide">
+            <div class="slide-content">
+                <i class="fas fa-question float-symbol fs-1 depth-front"></i>
+                <i class="fas fa-search float-symbol fs-4 depth-back"></i>
+                <h2 class="text-3xl font-bold mb-8 text-cyan-400 border-b-2 border-cyan-400 pb-2 px-8">مقدمة</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl w-full">
+                    <div class="glass p-8">
+                        <h3 class="text-xl font-bold text-purple-400 mb-4"><i class="fas fa-book-open ml-2"></i>تمهيد</h3>
+                        <p class="text-lg leading-loose text-gray-200 text-justify">تعد المؤسسات الناشئة العصب الحيوي للاقتصاد الجديد، إلا أنها تواجه تحديات تمويلية هيكلية. يهدف البحث إلى تسليط الضوء على <strong class="text-cyan-400">الصكوك الذكية</strong> كأداة مالية مبتكرة تجمع بين أصالة التمويل الإسلامي وكفاءة تقنية البلوك تشين.</p>
+                    </div>
+                    <div class="glass p-8 border border-red-500/30">
+                        <h3 class="text-xl font-bold text-red-400 mb-4"><i class="fas fa-question-circle ml-2"></i>الإشكالية</h3>
+                        <p class="text-xl font-bold leading-relaxed text-center py-4">كيف تساهم الصكوك الذكية في ردم الفجوة التمويلية للمؤسسات الناشئة في الأسواق المالية الإسلامية؟</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الشريحة 3: هيكل الدراسة (Hub) -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2 class="text-4xl font-bold mb-10 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">هيكل الدراسة</h2>
+                <div class="structure-container">
+                    <div class="structure-card" onclick="jumpToSlide(3)" style="--hover-color: #22d3ee;"><div class="icon-box text-cyan-400"><i class="fas fa-microchip"></i></div><div><h3>المبحث الأول</h3><p>المتغيرات الأساسية: المؤسسات الناشئة، الفجوة التمويلية، والعقود الذكية.</p></div><div class="btn-jump">انتقال <i class="fas fa-arrow-left"></i></div></div>
+                    <div class="structure-card" onclick="jumpToSlide(8)" style="--hover-color: #a855f7;"><div class="icon-box text-purple-400"><i class="fas fa-project-diagram"></i></div><div><h3>المبحث الثاني</h3><p>النظام البيئي (Ecosystem) ومراحل إصدار الصكوك الذكية.</p></div><div class="btn-jump">انتقال <i class="fas fa-arrow-left"></i></div></div>
+                    <div class="structure-card" onclick="jumpToSlide(10)" style="--hover-color: #4ade80;"><div class="icon-box text-green-400"><i class="fas fa-globe-asia"></i></div><div><h3>المبحث الثالث</h3><p>التجارب الرائدة: Blossom Finance (إندونيسيا) و منصة Wethaq.</p></div><div class="btn-jump">انتقال <i class="fas fa-arrow-left"></i></div></div>
+                    <div class="structure-card" onclick="jumpToSlide(12)" style="--hover-color: #fbbf24;"><div class="icon-box text-yellow-400"><i class="fas fa-chart-pie"></i></div><div><h3>المبحث الرابع</h3><p>التحليل الرباعي (SWOT) لواقع الصكوك الذكية في البيئة الجزائرية.</p></div><div class="btn-jump">انتقال <i class="fas fa-arrow-left"></i></div></div>
+                    <div class="structure-card" onclick="jumpToSlide(13)" style="--hover-color: #f87171;"><div class="icon-box text-red-400"><i class="fas fa-flag-checkered"></i></div><div><h3>الخاتمة</h3><p>الاستنتاجات النهائية والتوصيات المقترحة.</p></div><div class="btn-jump">انتقال <i class="fas fa-arrow-left"></i></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الشريحة 4: المؤسسات الناشئة -->
+        <div class="slide">
+            <div class="slide-content">
+                <i class="fas fa-rocket float-symbol fs-2 depth-front" style="color: #f472b6;"></i>
+                <i class="fas fa-chart-line float-symbol fs-5 depth-back"></i>
+                <div class="text-6xl text-purple-500 mb-6 animate-bounce"><i class="fas fa-rocket"></i></div>
+                <h2 class="text-4xl font-bold mb-6">المؤسسات الناشئة وخصائصها</h2>
+                <div class="glass p-6 rounded-xl mb-8 max-w-3xl text-center"><p class="text-xl text-gray-200">هي كيانات اقتصادية حديثة التأسيس قائمة على الابتكار، تتميز بإمكانيات نمو هائلة (Scalability) ولكنها تعمل في بيئة تتسم بعدم اليقين والمخاطر المرتفعة.</p></div>
+                <div class="flex gap-6 perspective-1000">
+                    <div class="bg-slate-800 p-4 rounded-lg text-center w-40 border border-gray-600 shadow-lg transform transition hover:rotate-y-12 hover:bg-slate-700"><i class="fas fa-lightbulb text-yellow-400 text-3xl mb-2"></i><h3 class="font-bold">الابتكار</h3></div>
+                    <div class="bg-slate-800 p-4 rounded-lg text-center w-40 border border-gray-600 shadow-lg transform transition hover:rotate-y-12 hover:bg-slate-700"><i class="fas fa-chart-line text-green-400 text-3xl mb-2"></i><h3 class="font-bold">النمو السريع</h3></div>
+                    <div class="bg-slate-800 p-4 rounded-lg text-center w-40 border border-gray-600 shadow-lg transform transition hover:rotate-y-12 hover:bg-slate-700"><i class="fas fa-exclamation-triangle text-red-400 text-3xl mb-2"></i><h3 class="font-bold">المخاطرة</h3></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الشريحة 5: الفجوة التمويلية -->
+        <div class="slide">
+            <div class="slide-content">
+                <i class="fas fa-coins float-symbol fs-1 depth-back" style="color: gold;"></i>
+                <i class="fas fa-link-slash float-symbol fs-3 depth-front" style="color: #ef4444;"></i>
+                <h2 class="text-3xl font-bold mb-6">دور التكنولوجيا في تقليل فجوة التمويل</h2>
+                <div class="flex flex-col md:flex-row items-stretch gap-6 max-w-6xl w-full h-3/4">
+                    <div class="glass p-6 w-full md:w-1/3 text-center border-t-4 border-red-500 flex flex-col justify-center">
+                        <div class="text-red-500 text-4xl mb-4"><i class="fas fa-chart-pie"></i></div>
+                        <h3 class="text-xl font-bold mb-4">طبيعة الفجوة</h3>
+                        <p class="text-gray-300 text-sm leading-relaxed">تواجه الناشئة صعوبة في الوصول للتمويل البنكي بسبب غياب الضمانات، مما يخلق "فجوة تمويلية".</p>
+                    </div>
+                    <div class="glass p-6 w-full md:w-2/3 border-t-4 border-cyan-500 overflow-y-auto custom-scroll">
+                        <h3 class="text-xl font-bold mb-4 text-cyan-400"><i class="fas fa-microchip ml-2"></i>الحل: التكنولوجيا المالية (FinTech)</h3>
+                        <div class="space-y-4 text-right">
+                            <div class="flex items-start gap-3 bg-slate-800/50 p-3 rounded hover:bg-slate-700 transition"><i class="fas fa-users text-blue-400 mt-1"></i><div><h4 class="font-bold text-sm">الوصول المباشر (P2P)</h4><p class="text-xs text-gray-400">منصات رقمية تجمع المستثمرين ورواد الأعمال.</p></div></div>
+                            <div class="flex items-start gap-3 bg-slate-800/50 p-3 rounded hover:bg-slate-700 transition"><i class="fas fa-coins text-yellow-400 mt-1"></i><div><h4 class="font-bold text-sm">خفض التكاليف</h4><p class="text-xs text-gray-400">تقليل تكاليف الإصدار والامتثال عبر البلوك تشين.</p></div></div>
+                            <div class="flex items-start gap-3 bg-slate-800/50 p-3 rounded hover:bg-slate-700 transition"><i class="fas fa-file-contract text-purple-400 mt-1"></i><div><h4 class="font-bold text-sm">الثقة والأتمتة</h4><p class="text-xs text-gray-400">العقود الذكية تضمن التنفيذ التلقائي للشروط.</p></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الشريحة 6: تعريف الصكوك الذكية -->
+        <div class="slide">
+            <div class="slide-content">
+                <i class="fas fa-cubes float-symbol fs-4 depth-back" style="color: #22d3ee;"></i>
+                <i class="fas fa-code float-symbol fs-2 depth-front" style="color: #a855f7;"></i>
+                <div class="mb-8 animate-pulse"><i class="fas fa-cube text-7xl text-cyan-400"></i></div>
+                <h2 class="text-5xl font-black mb-8 tracking-wide">تعريف الصكوك الذكية</h2>
+                <div class="glass p-12 max-w-5xl text-center relative border border-cyan-500/30 transform hover:scale-105 transition duration-500">
+                    <p class="text-3xl leading-loose font-bold text-gray-100">هي وثائق مالية رقمية متساوية القيمة، تمثل حصصاً شائعة في الملكية، يتم إصدارها وإدارتها عبر <span class="text-cyan-400 px-2 inline-block">تقنية البلوك تشين</span>، وتعتمد في عملها على <span class="text-purple-400 px-2 inline-block">العقود الذكية</span> لتنفيذ العمليات المالية تلقائياً.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- الشريحة 7: العقود الذكية -->
+        <div class="slide">
+            <div class="slide-content">
+                <i class="fas fa-robot float-symbol fs-1 depth-front"></i>
+                <i class="fas fa-lock float-symbol fs-5 depth-back"></i>
+                <h2 class="text-3xl font-bold mb-8 text-purple-400">العقود الذكية (Smart Contracts)</h2>
+                <div class="flex flex-col md:flex-row gap-8 max-w-5xl items-center">
+                    <div class="glass p-6 w-full md:w-1/2">
+                        <h3 class="font-bold mb-4 text-xl">التعريف</h3>
+                        <p class="text-lg text-gray-300 leading-relaxed">برمجيات "ذاتية التنفيذ" مخزنة على البلوك تشين، تنفذ شروط الاتفاق تلقائياً بمجرد تحققها دون الحاجة لوسيط بشري.</p>
+                    </div>
+                    <div class="w-full md:w-1/2 space-y-4">
+                        <div class="bg-slate-800 p-4 rounded-lg flex items-center gap-4 hover:translate-x-[-10px] transition duration-300"><i class="fas fa-bolt text-yellow-400 text-2xl"></i><div><h4 class="font-bold">السرعة</h4><p class="text-sm text-gray-400">تنفيذ فوري للمعاملات.</p></div></div>
+                        <div class="bg-slate-800 p-4 rounded-lg flex items-center gap-4 hover:translate-x-[-10px] transition duration-300"><i class="fas fa-shield-alt text-green-400 text-2xl"></i><div><h4 class="font-bold">الشفافية</h4><p class="text-sm text-gray-400">سجلات لا يمكن التلاعب بها.</p></div></div>
+                        <div class="bg-slate-800 p-4 rounded-lg flex items-center gap-4 hover:translate-x-[-10px] transition duration-300"><i class="fas fa-hand-holding-usd text-blue-400 text-2xl"></i><div><h4 class="font-bold">التكلفة</h4><p class="text-sm text-gray-400">إلغاء المصاريف الإدارية والوسطاء.</p></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الشريحة 8: مقارنة (The Evolution Bridge) + زر العودة -->
+        <div class="slide">
+            <div class="slide-content">
+                <i class="fas fa-balance-scale float-symbol fs-3 depth-front"></i>
+                <h2 class="text-3xl font-bold mb-10 text-center">جسر التطور: من التقليدي إلى الذكي</h2>
+                <div class="comparison-stage">
+                    <div class="comp-row"><div class="side-block side-left"><i class="fas fa-users text-2xl side-icon"></i><div class="text-content"><strong>تعدد الوسطاء</strong><p class="text-xs">بنوك، وكلاء، مقاصة</p></div></div><div class="pivot-point"><i class="fas fa-hand-holding-usd"></i><h4>التكلفة</h4></div><div class="side-block side-right"><div class="text-content"><strong>إلغاء الوسطاء (P2P)</strong><p class="text-xs">تقليل الرسوم بنسبة 90%</p></div><i class="fas fa-project-diagram text-2xl side-icon"></i></div></div>
+                    <div class="comp-row"><div class="side-block side-left"><i class="fas fa-file-alt text-2xl side-icon"></i><div class="text-content"><strong>ورقي ويدوي</strong><p class="text-xs">إجراءات بطيئة ومعقدة</p></div></div><div class="pivot-point"><i class="fas fa-cogs"></i><h4>آلية العمل</h4></div><div class="side-block side-right"><div class="text-content"><strong>أتمتة كاملة</strong><p class="text-xs">عقود ذكية ذاتية التنفيذ</p></div><i class="fas fa-robot text-2xl side-icon"></i></div></div>
+                    <div class="comp-row"><div class="side-block side-left"><i class="fas fa-calendar-alt text-2xl side-icon"></i><div class="text-content"><strong>تقارير دورية</strong><p class="text-xs">تأخر وصول المعلومة</p></div></div><div class="pivot-point"><i class="fas fa-eye"></i><h4>الشفافية</h4></div><div class="side-block side-right"><div class="text-content"><strong>تتبع لحظي</strong><p class="text-xs">شفافية مطلقة (Immutable)</p></div><i class="fas fa-search text-2xl side-icon"></i></div></div>
+                    <div class="comp-row"><div class="side-block side-left"><i class="fas fa-certificate text-2xl side-icon"></i><div class="text-content"><strong>حصص كبيرة</strong><p class="text-xs">حكر على كبار المستثمرين</p></div></div><div class="pivot-point"><i class="fas fa-globe"></i><h4>الوصول</h4></div><div class="side-block side-right"><div class="text-content"><strong>تجزئة (Tokenization)</strong><p class="text-xs">متاح لصغار المستثمرين</p></div><i class="fas fa-coins text-2xl side-icon"></i></div></div>
+                </div>
+            </div>
+            <!-- زر العودة للهيكل (نهاية المبحث الأول) -->
+            <button class="return-btn" onclick="jumpToSlide(2)">العودة لهيكل الدراسة <i class="fas fa-home"></i></button>
+        </div>
+
+        <!-- الشريحة 9: النظام البيئي العائم (3D) -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2 class="text-3xl font-bold mb-2 text-center text-cyan-400 border-b border-cyan-500/30 pb-4 w-full max-w-4xl relative z-20">النظام البيئي المتكامل (Ecosystem)</h2>
+                <div class="scene-container">
+                    <div class="ecosystem-plane" id="eco-plane">
+                        <div class="floor-grid"></div>
+                        <svg class="connections-svg"><defs><filter id="glow-line" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2" result="blur" /><feComposite in="SourceGraphic" in2="blur" operator="over" /></filter></defs><path d="M 400 250 L 400 50" class="connection-line" /> <path d="M 400 250 L 400 50" class="connection-pulse" style="animation-direction: reverse;" /><path d="M 510 250 Q 600 250 750 150" class="connection-line" /> <path d="M 510 250 Q 600 250 750 150" class="connection-pulse" /><path d="M 510 250 Q 600 250 750 400" class="connection-line" /> <path d="M 510 250 Q 600 250 750 400" class="connection-pulse" /><path d="M 290 250 Q 200 250 50 150" class="connection-line" /> <path d="M 290 250 Q 200 250 50 150" class="connection-pulse" style="animation-direction: reverse;" /><path d="M 290 250 Q 200 250 50 400" class="connection-line" /> <path d="M 290 250 Q 200 250 50 400" class="connection-pulse" style="animation-direction: reverse;" /></svg>
+                        <div class="eco-node node-center" title="النواة المركزية"><i class="fas fa-layer-group"></i><h3>شركة الغرض الخاص (SPV)</h3><p>الكيان القانوني الوسيط الذي يدير الأصول.</p></div>
+                        <div class="eco-node node-top"><i class="fas fa-scale-balanced"></i><h3>الهيئة الشرعية</h3><p>تمنح الموافقة وتراقب الالتزام بالأحكام.</p></div>
+                        <div class="eco-node node-right-top"><i class="fas fa-cubes"></i><h3>البلوك تشين</h3><p>سجل رقمي موزع يضمن الشفافية وعدم التلاعب.</p></div>
+                        <div class="eco-node node-right-bottom"><i class="fas fa-file-code"></i><h3>العقد الذكي</h3><p>كود برمجي ينفذ التوزيعات والشروط آلياً.</p></div>
+                        <div class="eco-node node-left-top"><i class="fas fa-user-tie"></i><h3>الجهة المصدرة</h3><p>المؤسسة الناشئة التي تحتاج للتمويل.</p></div>
+                        <div class="eco-node node-left-bottom"><i class="fas fa-building"></i><h3>الأصل الحقيقي</h3><p>مشروع أو أصل ملموس يضمن قيمة الصك.</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الشريحة 10: مراحل الإصدار (3D Pipeline) + زر العودة -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2 class="text-3xl font-bold mb-4 text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 w-full max-w-4xl relative z-20">خط التجميع الرقمي (Issuance Pipeline)</h2>
+                <div class="scene-container">
+                    <div class="workflow-plane" id="workflow-plane">
+                        <svg class="pipeline-svg"><path d="M 115 80 L 760 80 L 760 330 L 115 330" class="pipe-path" /><path d="M 115 80 L 760 80 L 760 330 L 115 330" class="pipe-core" /><circle r="6" class="data-packet"><animateMotion dur="6s" repeatCount="indefinite" path="M 115 80 L 760 80 L 760 330 L 115 330" /></circle></svg>
+                        <div class="step-card step-1"><div class="step-badge">1</div><i class="fas fa-bullhorn step-icon"></i><div class="step-title">إعلان الإصدار</div><div class="step-desc">تحديد نوع الصك والقيمة</div></div>
+                        <div class="step-card step-2"><div class="step-badge">2</div><i class="fas fa-file-signature step-icon"></i><div class="step-title">الاكتتاب</div><div class="step-desc">تسجيل طلبات الشراء رقمياً</div></div>
+                        <div class="step-card step-3"><div class="step-badge">3</div><i class="fas fa-chart-pie step-icon"></i><div class="step-title">التخصيص</div><div class="step-desc">توزيع الحصص على المستثمرين</div></div>
+                        <div class="step-card step-4"><div class="step-badge">4</div><i class="fas fa-code-branch step-icon"></i><div class="step-title">الترميز (Tokenization)</div><div class="step-desc">إصدار الرموز الرقمية (Tokens)</div></div>
+                        <div class="step-card step-5"><div class="step-badge">5</div><i class="fas fa-money-check-alt step-icon"></i><div class="step-title">التسوية (Settlement)</div><div class="step-desc">تحويل الأموال آلياً بالعقد الذكي</div></div>
+                        <div class="step-card step-6"><div class="step-badge">6</div><i class="fas fa-wallet step-icon"></i><div class="step-title">النقل للمحافظ</div><div class="step-desc">التداول في السوق الثانوي</div></div>
+                    </div>
+                </div>
+            </div>
+            <!-- زر العودة للهيكل (نهاية المبحث الثاني) -->
+            <button class="return-btn" onclick="jumpToSlide(2)">العودة لهيكل الدراسة <i class="fas fa-home"></i></button>
+        </div>
+
+        <!-- الشريحة 11: تجربة Blossom Finance -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2 class="text-3xl font-bold mb-6 text-green-400 border-b border-gray-700 pb-4"><i class="fas fa-leaf mr-2"></i>تجربة Blossom Finance (إندونيسيا)</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl w-full">
+                    <div class="glass p-8 rounded-xl hover:translate-z-10 transition duration-300 border-r-4 border-green-500">
+                        <div class="absolute -top-5 -right-5 text-green-400/20 text-8xl"><i class="fab fa-ethereum"></i></div>
+                        <h3 class="text-2xl font-bold mb-6 text-cyan-400 flex items-center gap-2"><i class="fas fa-cogs"></i> النموذج التشغيلي</h3>
+                        <ul class="space-y-4 text-base text-gray-200">
+                            <li class="flex items-center gap-3"><span class="bg-slate-800 p-2 rounded-full text-green-400"><i class="fab fa-ethereum"></i></span> <strong>التقنية:</strong> بلوك تشين Ethereum (بروتوكول ERC20).</li>
+                            <li class="flex items-center gap-3"><span class="bg-slate-800 p-2 rounded-full text-green-400"><i class="fas fa-handshake"></i></span> <strong>الهيكلة:</strong> صكوك "مضاربة" لتمويل المشاريع المتناهية الصغر.</li>
+                            <li class="flex items-center gap-3"><span class="bg-slate-800 p-2 rounded-full text-green-400"><i class="fas fa-robot"></i></span> <strong>الأتمتة:</strong> توزيع الأرباح تلقائياً (Smart Contracts).</li>
+                            <li class="flex items-center gap-3"><span class="bg-slate-800 p-2 rounded-full text-green-400"><i class="fas fa-money-bill-wave"></i></span> <strong>العملة:</strong> الروبية الإندونيسية (لتجنب تقلبات الكريبتو).</li>
+                        </ul>
+                    </div>
+                    <div class="glass p-8 rounded-xl hover:translate-z-10 transition duration-300 border-l-4 border-yellow-500 flex flex-col justify-center">
+                        <h3 class="text-2xl font-bold mb-6 text-yellow-400 flex items-center gap-2"><i class="fas fa-chart-line"></i> الأثر الاجتماعي والمالي</h3>
+                        <div class="grid grid-cols-2 gap-6 text-center mb-6">
+                            <div class="bg-slate-800/80 p-4 rounded-xl border border-gray-600 transform hover:scale-105 transition"><div class="text-4xl font-black text-green-400 mb-1">15.5%</div><div class="text-sm text-gray-400">عائد سنوي متوقع</div></div>
+                            <div class="bg-slate-800/80 p-4 rounded-xl border border-gray-600 transform hover:scale-105 transition"><div class="text-4xl font-black text-blue-400 mb-1">234+</div><div class="text-sm text-gray-400">مشروع ممول</div></div>
+                        </div>
+                        <div class="text-center bg-green-900/20 p-4 rounded-lg border border-green-500/30"><i class="fas fa-award text-yellow-500 text-2xl mb-2"></i><p class="font-bold text-white">جائزة أفضل تمويل أخضر</p><p class="text-xs text-gray-400">Global Islamic Finance Awards</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الشريحة 12: تجربة Wethaq + زر العودة -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2 class="text-3xl font-bold mb-6 text-blue-400 border-b border-gray-700 pb-4"><i class="fas fa-building mr-2"></i>منصة "وثاق" (Wethaq) - الإمارات/السعودية</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl w-full">
+                    <div class="glass p-8 rounded-xl border-t-4 border-blue-500 hover:translate-z-10 transition duration-300">
+                        <h3 class="text-2xl font-bold mb-6 text-blue-300"><i class="fas fa-shield-alt ml-2"></i>الريادة والتنظيم القانوني</h3>
+                        <ul class="space-y-4 text-gray-200">
+                            <li class="flex items-start gap-3"><i class="fas fa-check-circle text-green-400 mt-1 text-xl"></i><div><strong class="block text-white">أول منصة منظمة (Regulated)</strong><span class="text-sm text-gray-400">خاضعة لإشراف سلطة دبي للخدمات المالية (DFSA).</span></div></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-flask text-purple-400 mt-1 text-xl"></i><div><strong class="block text-white">البيئة التجريبية (Sandbox)</strong><span class="text-sm text-gray-400">مشاركة في الـ Fintech Lab لهيئة السوق المالية السعودية.</span></div></li>
+                        </ul>
+                        <div class="mt-6 flex justify-center gap-4"><div class="text-center px-4 py-2 bg-slate-800 rounded-lg border border-blue-500/30"><i class="fas fa-gavel text-2xl text-blue-500 block mb-1"></i><span class="text-xs">Regulated</span></div><div class="text-center px-4 py-2 bg-slate-800 rounded-lg border border-purple-500/30"><i class="fas fa-globe-asia text-2xl text-purple-500 block mb-1"></i><span class="text-xs">GCC Market</span></div></div>
+                    </div>
+                    <div class="glass p-8 rounded-xl border-t-4 border-purple-500 hover:translate-z-10 transition duration-300">
+                        <h3 class="text-2xl font-bold mb-6 text-purple-300"><i class="fas fa-microchip ml-2"></i>الابتكار التقني (R3 Corda)</h3>
+                        <ul class="space-y-4 text-gray-200">
+                            <li class="flex items-start gap-3"><i class="fas fa-file-contract text-yellow-400 mt-1 text-xl"></i><div><strong class="block text-white">Smart Clauses</strong><span class="text-sm text-gray-400">تحويل بنود العقد القانوني إلى كود برمجي ينفذ مهام الوكيل وأمين الحفظ.</span></div></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-university text-blue-400 mt-1 text-xl"></i><div><strong class="block text-white">تكامل Swift gpi</strong><span class="text-sm text-gray-400">التسوية المالية عبر القنوات البنكية التقليدية لضمان الامتثال، دون احتفاظ المنصة بالأموال.</span></div></li>
+                            <li class="flex items-start gap-3"><i class="fas fa-lock text-red-400 mt-1 text-xl"></i><div><strong class="block text-white">Private Ledger</strong><span class="text-sm text-gray-400">استخدام بلوك تشين خاص (Corda) لضمان خصوصية البيانات المالية.</span></div></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <!-- زر العودة للهيكل (نهاية المبحث الثالث) -->
+            <button class="return-btn" onclick="jumpToSlide(2)">العودة لهيكل الدراسة <i class="fas fa-home"></i></button>
+        </div>
+
+        <!-- الشريحة 13: SWOT + زر العودة -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2 class="text-3xl font-bold mb-6 text-center">التحليل الرباعي (SWOT) في البيئة الجزائرية</h2>
+                <div class="grid grid-cols-2 gap-6 max-w-6xl w-full h-[75vh]">
+                    <div class="glass p-5 border-t-4 border-green-500 hover:scale-[1.01] transition overflow-y-auto custom-scroll bg-green-900/10"><h3 class="font-bold text-green-400 mb-3 flex items-center text-lg sticky top-0 bg-slate-900/90 p-2 rounded z-10"><i class="fas fa-dumbbell ml-2"></i>نقاط القوة (Strengths)</h3><ul class="space-y-3 text-sm text-gray-200"><li class="flex items-start"><i class="fas fa-check text-green-500 ml-2 mt-1"></i> <strong>الشفافية:</strong> سجلات البلوك تشين تعزز الثقة في السوق المالي.</li><li class="flex items-start"><i class="fas fa-check text-green-500 ml-2 mt-1"></i> <strong>الكفاءة:</strong> خفض تكاليف الإصدار وإلغاء الوسطاء غير الضروريين.</li><li class="flex items-start"><i class="fas fa-check text-green-500 ml-2 mt-1"></i> <strong>الأتمتة:</strong> العقود الذكية تضمن توزيع الأرباح والامتثال الشرعي آلياً.</li><li class="flex items-start"><i class="fas fa-check text-green-500 ml-2 mt-1"></i> <strong>الأمان:</strong> صعوبة تزوير أو تغيير بيانات الملكية بفضل التشفير.</li></ul></div>
+                    <div class="glass p-5 border-t-4 border-yellow-500 hover:scale-[1.01] transition overflow-y-auto custom-scroll bg-yellow-900/10"><h3 class="font-bold text-yellow-400 mb-3 flex items-center text-lg sticky top-0 bg-slate-900/90 p-2 rounded z-10"><i class="fas fa-exclamation-triangle ml-2"></i>نقاط الضعف (Weaknesses)</h3><ul class="space-y-3 text-sm text-gray-200"><li class="flex items-start"><i class="fas fa-minus text-yellow-500 ml-2 mt-1"></i> <strong>حداثة التقنية:</strong> قلة الخبرة العملية والتطبيقات السابقة في السوق المحلي.</li><li class="flex items-start"><i class="fas fa-minus text-yellow-500 ml-2 mt-1"></i> <strong>نقص الكوادر:</strong> ندرة الخبراء الذين يجمعون بين الفقه المالي والبرمجة.</li><li class="flex items-start"><i class="fas fa-minus text-yellow-500 ml-2 mt-1"></i> <strong>التكلفة الأولية:</strong> الاستثمار العالي المطلوب لبناء البنية التحتية الرقمية.</li><li class="flex items-start"><i class="fas fa-minus text-yellow-500 ml-2 mt-1"></i> <strong>الوعي العام:</strong> ضعف الثقافة المالية الرقمية لدى صغار المستثمرين.</li></ul></div>
+                    <div class="glass p-5 border-t-4 border-blue-500 hover:scale-[1.01] transition overflow-y-auto custom-scroll bg-blue-900/10"><h3 class="font-bold text-blue-400 mb-3 flex items-center text-lg sticky top-0 bg-slate-900/90 p-2 rounded z-10"><i class="fas fa-lightbulb ml-2"></i>الفرص (Opportunities)</h3><ul class="space-y-3 text-sm text-gray-200"><li class="flex items-start"><i class="fas fa-arrow-up text-blue-500 ml-2 mt-1"></i> <strong>الإرادة السياسية:</strong> دعم وزارة اقتصاد المعرفة والمؤسسات الناشئة.</li><li class="flex items-start"><i class="fas fa-arrow-up text-blue-500 ml-2 mt-1"></i> <strong>الصيرفة الإسلامية:</strong> انتشار الشبابيك الإسلامية يعكس طلباً متزايداً على المنتجات الشرعية.</li><li class="flex items-start"><i class="fas fa-arrow-up text-blue-500 ml-2 mt-1"></i> <strong>الشباب التكنولوجي:</strong> وجود قاعدة واسعة من المطورين والمهتمين بالعملات الرقمية.</li><li class="flex items-start"><i class="fas fa-arrow-up text-blue-500 ml-2 mt-1"></i> <strong>الشمول المالي:</strong> إمكانية وصول التمويل لمناطق نائية عبر الهواتف الذكية.</li></ul></div>
+                    <div class="glass p-5 border-t-4 border-red-500 hover:scale-[1.01] transition overflow-y-auto custom-scroll bg-red-900/10"><h3 class="font-bold text-red-400 mb-3 flex items-center text-lg sticky top-0 bg-slate-900/90 p-2 rounded z-10"><i class="fas fa-bomb ml-2"></i>التهديدات (Threats)</h3><ul class="space-y-3 text-sm text-gray-200"><li class="flex items-start"><i class="fas fa-times text-red-500 ml-2 mt-1"></i> <strong>الفراغ التشريعي:</strong> عدم وضوح الوضع القانوني للأصول الرقمية (Tokenized Assets).</li><li class="flex items-start"><i class="fas fa-times text-red-500 ml-2 mt-1"></i> <strong>مقاومة التغيير:</strong> بيروقراطية المؤسسات المالية التقليدية وبطء تبنيها للتكنولوجيا.</li><li class="flex items-start"><i class="fas fa-times text-red-500 ml-2 mt-1"></i> <strong>الأمن السيبراني:</strong> مخاطر الاختراق والهجمات على منصات العقود الذكية.</li><li class="flex items-start"><i class="fas fa-times text-red-500 ml-2 mt-1"></i> <strong>تقلبات السوق:</strong> ارتباط غير مباشر بسمعة سوق "الكريبتو" المتقلب.</li></ul></div>
+                </div>
+            </div>
+            <!-- زر العودة للهيكل (نهاية المبحث الرابع) -->
+            <button class="return-btn" onclick="jumpToSlide(2)">العودة لهيكل الدراسة <i class="fas fa-home"></i></button>
+        </div>
+
+        <!-- الشريحة 14: الخاتمة والتوصيات -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2 class="text-4xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">الخاتمة والتوصيات</h2>
+                <div class="glass p-6 max-w-5xl w-full mb-6 text-center border border-cyan-500/30"><p class="text-lg leading-loose text-gray-100">تُمثل <strong class="text-cyan-400">الصكوك الذكية</strong> نقلة نوعية في هندسة المالية الإسلامية، حيث توفر حلاً يجمع بين الكفاءة التقنية والامتثال الشرعي. ولتفعيلها في الجزائر نقترح:</p></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl w-full">
+                    <div class="bg-slate-800/80 p-5 rounded-xl border-r-4 border-blue-500 flex items-start gap-4 hover:bg-slate-700 transition transform hover:-translate-y-1"><div class="bg-blue-900/40 p-3 rounded-full"><i class="fas fa-gavel text-2xl text-blue-400"></i></div><div><h3 class="font-bold text-lg text-blue-300 mb-1">الجانب التشريعي</h3><p class="text-sm text-gray-300 leading-snug">دعوة البنك المركزي ولجنة تنظيم عمليات البورصة (COSOB) لسن إطار تنظيمي للأصول الرقمية (Digital Assets) يضمن حماية المستثمرين.</p></div></div>
+                    <div class="bg-slate-800/80 p-5 rounded-xl border-r-4 border-purple-500 flex items-start gap-4 hover:bg-slate-700 transition transform hover:-translate-y-1"><div class="bg-purple-900/40 p-3 rounded-full"><i class="fas fa-server text-2xl text-purple-400"></i></div><div><h3 class="font-bold text-lg text-purple-300 mb-1">البنية التحتية</h3><p class="text-sm text-gray-300 leading-snug">إنشاء "منصة وطنية للصكوك الذكية" تعتمد على بلوك تشين خاص (Private Blockchain) لضمان السيادة الرقمية وأمن البيانات.</p></div></div>
+                    <div class="bg-slate-800/80 p-5 rounded-xl border-r-4 border-green-500 flex items-start gap-4 hover:bg-slate-700 transition transform hover:-translate-y-1"><div class="bg-green-900/40 p-3 rounded-full"><i class="fas fa-handshake text-2xl text-green-400"></i></div><div><h3 class="font-bold text-lg text-green-300 mb-1">البيئة الريادية</h3><p class="text-sm text-gray-300 leading-snug">ربط المنصة مع "صندوق الشركات الناشئة" (ASF) والمسرعات لتوفير قنوات تمويل هجينة ومبتكرة.</p></div></div>
+                    <div class="bg-slate-800/80 p-5 rounded-xl border-r-4 border-yellow-500 flex items-start gap-4 hover:bg-slate-700 transition transform hover:-translate-y-1"><div class="bg-yellow-900/40 p-3 rounded-full"><i class="fas fa-graduation-cap text-2xl text-yellow-400"></i></div><div><h3 class="font-bold text-lg text-yellow-300 mb-1">الاستثمار البشري</h3><p class="text-sm text-gray-300 leading-snug">فتح تخصصات "FinTech" و "Blockchain" في الجامعات الجزائرية لتكوين كفاءات تجمع بين المعرفة التقنية والمالية.</p></div></div>
+                </div>
+            </div>
+            <!-- زر العودة للهيكل (نهاية الخاتمة وقبل الشكر) -->
+            <button class="return-btn" onclick="jumpToSlide(2)">العودة لهيكل الدراسة <i class="fas fa-home"></i></button>
+        </div>
+
+        <!-- الشريحة 15: شكراً -->
+        <div class="slide">
+            <div class="slide-content">
+                <div class="text-7xl text-cyan-400 mb-8 animate-pulse shadow-cyan-500/50 drop-shadow-2xl"><i class="fas fa-check-circle"></i></div>
+                <h1 class="text-6xl font-black mb-8 text-white tracking-wider">شكراً لحسن إصغائكم</h1>
+                <p class="text-2xl text-gray-400 mb-12 font-light">هل لديكم أي أسئلة؟</p>
+                <div class="glass p-6 rounded-full px-12 border border-cyan-500/30 flex items-center gap-4 bg-slate-800/50"><i class="fas fa-user-graduate text-cyan-400"></i><p class="text-lg text-gray-200 font-bold">إعداد الطالب: غوطي ادم</p><span class="w-px h-6 bg-gray-500 mx-2"></span><p class="text-lg text-gray-400">2025 / 2026</p></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- التحكم -->
+    <div class="controls">
+        <button onclick="prevSlide()" class="p-3 hover:text-cyan-400 text-white transition"><i class="fas fa-chevron-right text-xl"></i></button>
+        <span id="slide-count" class="font-bold text-cyan-400 mx-4">1 / 15</span>
+        <button onclick="nextSlide()" class="p-3 hover:text-cyan-400 text-white transition"><i class="fas fa-chevron-left text-xl"></i></button>
+    </div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const countSpan = document.getElementById('slide-count');
+        let currentSlide = 0;
+        let isAnimating = false;
+
+        function updateSlideCount() {
+            countSpan.innerText = `${currentSlide + 1} / ${slides.length}`;
+        }
+
+        // --- 3D PARALLAX EFFECT ---
+        document.addEventListener('mousemove', (e) => {
+            if(window.innerWidth < 768) return;
+            const x = (window.innerWidth / 2 - e.pageX) / 40;
+            const y = (window.innerHeight / 2 - e.pageY) / 40;
+
+            const activeContent = slides[currentSlide].querySelector('.slide-content');
+            if(activeContent) activeContent.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
+
+            if(currentSlide === 8) { // Ecosystem
+                const plane = document.getElementById('eco-plane');
+                if(plane) plane.style.transform = `rotateX(${25 + y}deg) rotateY(${x}deg)`;
+            }
+            if(currentSlide === 9) { // Pipeline
+                const wfPlane = document.getElementById('workflow-plane');
+                if(wfPlane) wfPlane.style.transform = `rotateX(${20 + y}deg) rotateY(${10 + x}deg)`;
+            }
+        });
+
+        // --- NAVIGATION ---
+        function nextSlide() {
+            if (isAnimating || currentSlide >= slides.length - 1) return;
+            isAnimating = true;
+            const currentEl = slides[currentSlide];
+            const nextEl = slides[currentSlide + 1];
+            currentEl.classList.add('rotate-out-right'); currentEl.classList.remove('active');
+            nextEl.classList.add('active', 'rotate-in-left');
+            currentSlide++; updateSlideCount();
+            setTimeout(() => {
+                currentEl.classList.remove('rotate-out-right'); nextEl.classList.remove('rotate-in-left');
+                if(currentEl.querySelector('.slide-content')) currentEl.querySelector('.slide-content').style.transform = '';
+                isAnimating = false;
+            }, 1000);
+        }
+        function prevSlide() {
+            if (isAnimating || currentSlide <= 0) return;
+            isAnimating = true;
+            const currentEl = slides[currentSlide];
+            const prevEl = slides[currentSlide - 1];
+            currentEl.classList.add('rotate-out-left'); currentEl.classList.remove('active');
+            prevEl.classList.add('active', 'rotate-in-right');
+            currentSlide--; updateSlideCount();
+            setTimeout(() => {
+                currentEl.classList.remove('rotate-out-left'); prevEl.classList.remove('rotate-in-right');
+                if(currentEl.querySelector('.slide-content')) currentEl.querySelector('.slide-content').style.transform = '';
+                isAnimating = false;
+            }, 1000);
+        }
+        
+        // --- JUMP FUNCTION (Structure & Return) ---
+        function jumpToSlide(index) {
+            if (isAnimating || currentSlide === index) return;
+            isAnimating = true;
+            
+            const currentEl = slides[currentSlide];
+            const nextEl = slides[index];
+            
+            // Zoom effect for jump
+            currentEl.classList.add('zoom-out');
+            currentEl.classList.remove('active');
+            
+            nextEl.classList.add('active', 'zoom-in');
+            
+            currentSlide = index;
+            updateSlideCount();
+            
+            setTimeout(() => {
+                currentEl.classList.remove('zoom-out');
+                nextEl.classList.remove('zoom-in');
+                if(currentEl.querySelector('.slide-content')) currentEl.querySelector('.slide-content').style.transform = '';
+                isAnimating = false;
+            }, 1000);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') nextSlide();
+            if (e.key === 'ArrowRight') prevSlide();
+        });
+
+        // --- PARTICLES ---
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height, particles = [];
+        function resize() { width = window.innerWidth; height = window.innerHeight; canvas.width = width; canvas.height = height; initParticles(); }
+        class Particle {
+            constructor() { this.x = Math.random() * width; this.y = Math.random() * height; this.vx = (Math.random() - 0.5) * 0.5; this.vy = (Math.random() - 0.5) * 0.5; this.size = Math.random() * 2; }
+            update() { this.x += this.vx; this.y += this.vy; if(this.x < 0 || this.x > width) this.vx *= -1; if(this.y < 0 || this.y > height) this.vy *= -1; }
+            draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fillStyle = 'rgba(6,182,212,0.3)'; ctx.fill(); }
+        }
+        function initParticles() { particles = []; for(let i=0; i<60; i++) particles.push(new Particle()); }
+        function animate() {
+            ctx.clearRect(0,0,width,height); particles.forEach(p => { p.update(); p.draw(); });
+            for(let i=0; i<particles.length; i++){
+                for(let j=i+1; j<particles.length; j++){
+                    let dx = particles[i].x - particles[j].x; let dy = particles[i].y - particles[j].y; let dist = Math.sqrt(dx*dx + dy*dy);
+                    if(dist < 120) { ctx.beginPath(); ctx.strokeStyle = `rgba(6,182,212,${0.15 - dist/120})`; ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.stroke(); }
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+        window.addEventListener('resize', resize); resize(); animate();
+    </script>
+</body>
+</html>
